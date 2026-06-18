@@ -36,6 +36,9 @@ public class DashboardService {
 
         Map<Long, Long> equipmentWorkMinutes = new HashMap<>();
         for (ScheduleTask task : tasks) {
+            if (task.getStartTime() == null || task.getEndTime() == null) {
+                continue;
+            }
             LocalDateTime taskStart = task.getStartTime().isBefore(startOfDay) ? startOfDay : task.getStartTime();
             LocalDateTime taskEnd = task.getEndTime().isAfter(endOfDay) ? endOfDay : task.getEndTime();
 
@@ -84,18 +87,26 @@ public class DashboardService {
         }
 
         int onTimeCount = 0;
+        int checkedCount = 0;
         for (ProductionOrder order : orders) {
+            if (order.getDeliveryEndTime() == null) {
+                continue;
+            }
             List<ScheduleTask> tasks = taskRepository.findByOrderIdOrderByStartTime(order.getId());
             if (tasks.isEmpty()) {
                 continue;
             }
             ScheduleTask lastTask = tasks.get(tasks.size() - 1);
+            if (lastTask.getEndTime() == null) {
+                continue;
+            }
+            checkedCount++;
             if (!lastTask.getEndTime().isAfter(order.getDeliveryEndTime())) {
                 onTimeCount++;
             }
         }
 
-        return (double) onTimeCount / orders.size() * 100;
+        return checkedCount == 0 ? 100.0 : (double) onTimeCount / checkedCount * 100;
     }
 
     public EquipmentUtilizationDTO getBottleneckEquipment(LocalDate date) {
@@ -192,10 +203,13 @@ public class DashboardService {
         int delayedCount = 0;
 
         for (ProductionOrder order : allOrders) {
+            if (order.getDeliveryEndTime() == null) {
+                continue;
+            }
             List<ScheduleTask> tasks = taskRepository.findByOrderIdOrderByStartTime(order.getId());
             if (!tasks.isEmpty()) {
                 ScheduleTask lastTask = tasks.get(tasks.size() - 1);
-                if (lastTask.getEndTime().isAfter(order.getDeliveryEndTime())) {
+                if (lastTask.getEndTime() != null && lastTask.getEndTime().isAfter(order.getDeliveryEndTime())) {
                     delayedCount++;
                 }
                 if (lastTask.getStatus() == ScheduleTask.TaskStatus.COMPLETED) {

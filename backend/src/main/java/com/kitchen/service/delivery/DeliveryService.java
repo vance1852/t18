@@ -46,7 +46,7 @@ public class DeliveryService {
             String area = entry.getKey();
             List<ProductionOrder> areaOrders = entry.getValue();
 
-            areaOrders.sort(Comparator.comparing(ProductionOrder::getDeliveryStartTime));
+            areaOrders.sort(Comparator.comparing(ProductionOrder::getDeliveryStartTime, Comparator.nullsLast(Comparator.naturalOrder())));
 
             List<List<ProductionOrder>> batches = splitIntoBatches(areaOrders);
 
@@ -57,6 +57,7 @@ public class DeliveryService {
 
                 LocalDateTime deliveryStartTime = batchOrders.stream()
                     .map(ProductionOrder::getDeliveryStartTime)
+                    .filter(Objects::nonNull)
                     .min(LocalDateTime::compareTo)
                     .orElse(LocalDateTime.now().plusHours(2));
 
@@ -93,7 +94,7 @@ public class DeliveryService {
             }
         }
 
-        allBatches.sort(Comparator.comparing(DeliveryBatch::getDepartureTime));
+        allBatches.sort(Comparator.comparing(DeliveryBatch::getDepartureTime, Comparator.nullsLast(Comparator.naturalOrder())));
 
         return allBatches;
     }
@@ -127,7 +128,7 @@ public class DeliveryService {
             List<ScheduleTask> tasks = taskRepository.findByOrderIdOrderByStartTime(order.getId());
             if (!tasks.isEmpty()) {
                 LocalDateTime orderEndTime = tasks.get(tasks.size() - 1).getEndTime();
-                if (orderEndTime.isAfter(latestEndTime)) {
+                if (orderEndTime != null && orderEndTime.isAfter(latestEndTime)) {
                     latestEndTime = orderEndTime;
                 }
             }
@@ -141,7 +142,7 @@ public class DeliveryService {
         if (batches.isEmpty()) {
             return generateDeliveryPlan();
         }
-        batches.sort(Comparator.comparing(DeliveryBatch::getDepartureTime));
+        batches.sort(Comparator.comparing(DeliveryBatch::getDepartureTime, Comparator.nullsLast(Comparator.naturalOrder())));
         return batches;
     }
 }

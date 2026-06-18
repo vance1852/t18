@@ -44,7 +44,8 @@ public class MaterialService {
             }
 
             ScheduleTask firstTask = orderTaskList.stream()
-                .min(Comparator.comparing(ScheduleTask::getStartTime))
+                .filter(t -> t.getStartTime() != null)
+                .min(Comparator.comparing(ScheduleTask::getStartTime, Comparator.nullsLast(Comparator.naturalOrder())))
                 .orElse(null);
 
             if (firstTask == null) {
@@ -88,11 +89,13 @@ public class MaterialService {
                 double remainingStock = totalStock;
                 List<Map.Entry<Long, Double>> sortedRequirements = entry.getValue().entrySet().stream()
                     .sorted(Comparator.comparing(e -> {
-                        LocalDateTime firstTaskTime = orderTasks.get(e.getKey()).stream()
-                            .min(Comparator.comparing(ScheduleTask::getStartTime))
+                        List<ScheduleTask> taskList = orderTasks.get(e.getKey());
+                        if (taskList == null || taskList.isEmpty()) return LocalDateTime.MAX;
+                        return taskList.stream()
+                            .filter(t -> t.getStartTime() != null)
+                            .min(Comparator.comparing(ScheduleTask::getStartTime, Comparator.nullsLast(Comparator.naturalOrder())))
                             .map(ScheduleTask::getStartTime)
                             .orElse(LocalDateTime.MAX);
-                        return firstTaskTime;
                     }))
                     .collect(Collectors.toList());
 
@@ -100,11 +103,15 @@ public class MaterialService {
                     remainingStock -= reqEntry.getValue();
                     if (remainingStock < 0) {
                         Long orderId = reqEntry.getKey();
-                        ScheduleTask firstTask = orderTasks.get(orderId).stream()
-                            .min(Comparator.comparing(ScheduleTask::getStartTime))
-                            .orElse(null);
-                        if (firstTask != null) {
-                            shortageTime = firstTask.getStartTime();
+                        List<ScheduleTask> taskList = orderTasks.get(orderId);
+                        if (taskList != null && !taskList.isEmpty()) {
+                            ScheduleTask firstTask = taskList.stream()
+                                .filter(t -> t.getStartTime() != null)
+                                .min(Comparator.comparing(ScheduleTask::getStartTime, Comparator.nullsLast(Comparator.naturalOrder())))
+                                .orElse(null);
+                            if (firstTask != null) {
+                                shortageTime = firstTask.getStartTime();
+                            }
                         }
                         break;
                     }

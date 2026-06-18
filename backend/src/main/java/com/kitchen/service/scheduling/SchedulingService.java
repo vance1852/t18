@@ -34,7 +34,8 @@ public class SchedulingService {
             orders = orderRepository.findAllById(orderIds);
         }
 
-        orders.sort(Comparator.comparing(ProductionOrder::getDeliveryEndTime));
+        orders.removeIf(o -> o.getDeliveryEndTime() == null);
+        orders.sort(Comparator.comparing(ProductionOrder::getDeliveryEndTime, Comparator.nullsLast(Comparator.naturalOrder())));
 
         for (ProductionOrder order : orders) {
             taskRepository.deleteByOrderId(order.getId());
@@ -103,7 +104,7 @@ public class SchedulingService {
                         startTime = eqAvailableTime;
                     }
 
-                    if (startTime.isBefore(bestStartTime) || bestStartTime == null) {
+                    if (bestStartTime == null || startTime.isBefore(bestStartTime)) {
                         bestStartTime = startTime;
                         bestEquipment = eq;
                         minSetupTime = setupTime;
@@ -174,7 +175,7 @@ public class SchedulingService {
 
             for (Map.Entry<Long, List<ScheduleTask>> entry : equipmentTaskMap.entrySet()) {
                 List<ScheduleTask> eqTasks = entry.getValue();
-                eqTasks.sort(Comparator.comparing(ScheduleTask::getStartTime));
+                eqTasks.sort(Comparator.comparing(ScheduleTask::getStartTime, Comparator.nullsLast(Comparator.naturalOrder())));
 
                 for (int i = 0; i < eqTasks.size() - 1; i++) {
                     ScheduleTask task1 = eqTasks.get(i);
@@ -304,7 +305,8 @@ public class SchedulingService {
 
     public ScheduleResultDTO getSchedule() {
         List<ScheduleTask> tasks = taskRepository.findAll();
-        tasks.sort(Comparator.comparing(ScheduleTask::getStartTime));
+        tasks.removeIf(t -> t.getStartTime() == null);
+        tasks.sort(Comparator.comparing(ScheduleTask::getStartTime, Comparator.nullsLast(Comparator.naturalOrder())));
 
         List<Long> delayedOrderIds = new ArrayList<>();
         Map<Long, ScheduleTask> orderLastTask = new HashMap<>();
@@ -349,12 +351,16 @@ public class SchedulingService {
         dto.setStartTime(task.getStartTime());
         dto.setEndTime(task.getEndTime());
         dto.setSetupEndTime(task.getSetupEndTime());
-        dto.setStatus(task.getStatus().name());
+        dto.setStatus(task.getStatus() != null ? task.getStatus().name() : "PENDING");
 
         ProductionOrder order = orderRepository.findById(task.getOrderId()).orElse(null);
         if (order != null) {
             dto.setOrderNo(order.getOrderNo());
-            dto.setIsDelayed(task.getEndTime().isAfter(order.getDeliveryEndTime()));
+            if (task.getEndTime() != null && order.getDeliveryEndTime() != null) {
+                dto.setIsDelayed(task.getEndTime().isAfter(order.getDeliveryEndTime()));
+            } else {
+                dto.setIsDelayed(false);
+            }
         }
 
         return dto;
